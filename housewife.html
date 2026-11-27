@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Housewife · Tate McRae</title>
+<link rel="stylesheet" href="housewife.css">
+</head>
+<body>
+<div class="grain" aria-hidden="true"></div>
+
+<header class="nav ui">
+  <a class="back" href="index.html#releases">← So Close To What???</a>
+  <nav>
+    <a href="#models">CD &amp; Vinyl</a>
+    <a href="#tracks">Tracklist</a>
+    <a href="#releases">More</a>
+    <a href="#shop">Shop</a>
+  </nav>
+</header>
+
+<button id="cleanToggle" class="clean-toggle" aria-pressed="false"><span class="eye"></span><span class="lbl">View only</span></button>
+
+<!-- HERO: the two official covers -->
+<section class="hero" id="top">
+  <div class="hero-art">
+    <img id="coverA" class="cover on" src="img/housewife/cover.webp" alt="Housewife single cover">
+    <img id="coverB" class="cover" src="img/housewife/cover-halloween.webp" alt="Housewife Halloween cover">
+  </div>
+  <div class="hero-text ui">
+    <p class="kicker">Tate McRae · Single · TM4</p>
+    <h1 class="title">HOUSEWIFE</h1>
+    <div class="cover-switch" role="tablist" aria-label="Cover">
+      <button class="on" data-cover="A" role="tab" aria-selected="true">Original</button>
+      <button data-cover="B" role="tab" aria-selected="false">Halloween</button>
+    </div>
+    <div class="cta">
+      <a class="btn primary" target="_blank" rel="noopener" href="https://open.spotify.com/track/2sFepQNyl1WjpROruP8bJ0">Listen on Spotify</a>
+      <a class="btn" target="_blank" rel="noopener" href="https://music.apple.com/us/album/housewife/6822497770?i=6822497774">Apple Music</a>
+    </div>
+  </div>
+</section>
+
+<!-- 3D: CD versions + 7" vinyl -->
+<section class="models" id="models">
+  <canvas id="hwGL"></canvas>
+  <div class="model-ui ui">
+    <p class="kicker">Physical</p>
+    <h2 id="modelTitle">CD SINGLE</h2>
+    <p class="note" id="modelNote">Ships soon. Back is a mockup until the real one is shown.</p>
+  </div>
+  <div class="model-bar">
+    <div class="tabs" role="tablist">
+      <button class="on" data-model="cd">CD</button>
+      <button data-model="vinyl">7" Vinyl</button>
+    </div>
+    <div class="variants" id="variants">
+      <button class="on" data-v="cd-housewife"><img src="img/housewife/cd-housewife-m.webp" alt=""><span>Housewife</span></button>
+      <button data-v="cd-life-imitating-art"><img src="img/housewife/cd-life-imitating-art-m.webp" alt=""><span>Life Imitating Art</span></button>
+      <button data-v="cd-run-away-with-me"><img src="img/housewife/cd-run-away-with-me-m.webp" alt=""><span>Run Away With Me</span></button>
+      <button data-v="cd-icing-on-the-dream"><img src="img/housewife/cd-icing-on-the-dream-m.webp" alt=""><span>Icing On The Dream</span></button>
+    </div>
+    <div class="actions">
+      <button id="flipBtn">Flip</button>
+      <button id="pullBtn" hidden>Pull out record</button>
+    </div>
+  </div>
+  <div class="drag-hint">Drag to rotate</div>
+</section>
+
+<!-- TRACKLIST -->
+<section class="tracks ui" id="tracks">
+  <h2>TRACKLIST</h2>
+  <ol class="tracklist" id="tracklist"></ol>
+  <div class="player-slot" id="playerSlot" hidden><div id="spotifyEmbed"></div></div>
+</section>
+
+<!-- MORE FROM TATE -->
+<section class="releases ui" id="releases">
+  <h2>MORE FROM TATE</h2>
+  <div class="rel-grid">
+    <a class="rel" href="index.html" style="--c1:#0c0e14;--c2:#3d4a78;--c3:#7185b6;--glow:rgba(89,112,166,.45)">
+      <div class="rel-art"><img src="img/cover-front.webp" alt="SO CLOSE TO WHAT??? (Deluxe) cover" loading="lazy"></div>
+      <div class="rel-soon"><span class="rel-kind">Deluxe Album · 2025</span><span class="rel-name">SO CLOSE TO WHAT???</span><span class="rel-cta">Explore →</span></div>
+    </a>
+    <a class="rel soon" href="#releases" style="--c1:#1e1a16;--c2:#856d58;--c3:#dcc6a8;--glow:rgba(176,141,105,.4)">
+      <div class="rel-art"><img src="img/releases/so-close-to-what.webp" alt="So Close To What cover" loading="lazy"></div>
+      <div class="rel-soon"><span class="rel-kind">Album · 2025</span><span class="rel-name">SO CLOSE TO WHAT</span><span class="rel-cta">Coming soon</span></div>
+    </a>
+    <a class="rel soon" href="#releases" style="--c1:#0d0f10;--c2:#3a4fd8;--c3:#f2f2f0;--glow:rgba(58,79,216,.45)">
+      <div class="rel-art"><img src="img/releases/think-later.webp" alt="THINK LATER cover" loading="lazy"></div>
+      <div class="rel-soon"><span class="rel-kind">Album · 2023</span><span class="rel-name">THINK LATER</span><span class="rel-cta">Coming soon</span></div>
+    </a>
+  </div>
+</section>
+
+<!-- SHOP -->
+<section class="shop ui" id="shop">
+  <h2>SHOP</h2>
+  <div class="shop-grid">
+    <a class="item" target="_blank" rel="noopener" href="https://tatemcrae.store/products/housewife-cd-single"><img src="img/housewife/cd-housewife-m.webp" alt=""><span>Housewife CD</span></a>
+    <a class="item" target="_blank" rel="noopener" href="https://tatemcrae.store/products/life-imitating-art-cd-single"><img src="img/housewife/cd-life-imitating-art-m.webp" alt=""><span>Life Imitating Art CD</span></a>
+    <a class="item" target="_blank" rel="noopener" href="https://tatemcrae.store/products/run-away-with-me-cd-single"><img src="img/housewife/cd-run-away-with-me-m.webp" alt=""><span>Run Away With Me CD</span></a>
+    <a class="item" target="_blank" rel="noopener" href="https://tatemcrae.store/products/icing-on-the-dream-cd-single"><img src="img/housewife/cd-icing-on-the-dream-m.webp" alt=""><span>Icing On The Dream CD</span></a>
+    <a class="item" target="_blank" rel="noopener" href="https://tatemcrae.store/products/housewife-7-single"><img src="img/housewife/cover-m.webp" alt=""><span>Housewife 7" Vinyl</span></a>
+  </div>
+</section>
+
+<footer class="ui"><p>Fan-made site. Not affiliated with Tate McRae or her label. Artwork © its respective owners.</p></footer>
+
+<script>window.spotifyReady = new Promise(r => { window.onSpotifyIframeApiReady = r; });</script>
+<script src="https://open.spotify.com/embed/iframe-api/v1" async onerror="window.spotifyBlocked = true"></script>
+<script type="module" src="housewife.js"></script>
+</body>
+</html>

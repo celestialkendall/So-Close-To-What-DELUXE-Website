@@ -307,7 +307,7 @@ function makeStage(canvas) {
     if (!hit) { pickables.forEach(p => p.focus = 0); return; }
     const owner = pickables.find(p => { let o = hit.object; while (o) { if (o === p.obj) return true; o = o.parent; } return false; });
     // pieces only pop out where the collision test showed there is room in front of them
-    const blocked = owner?.noLift?.some(([x, y]) => st.p >= x - .02 && st.p <= y + .02);
+    const blocked = st.p < (owner?.minP ?? 0) || owner?.noLift?.some(([x, y]) => st.p >= x - .02 && st.p <= y + .02);
     pickables.forEach(p => p.focus = p === owner && !blocked ? (p.focus ? 0 : 1) : 0);
   });
 
@@ -408,18 +408,61 @@ function labelTex(side, songs, bg = '#2b2d34', fg = '#eef1f8') {
     x.globalCompositeOperation = 'destination-out'; x.beginPath(); x.arc(c, c, 100, 0, 7); x.fill();
   }, 4096);
 }
+// Deluxe CD face (from unboxing footage): bare silver, white ink only. Transparent elsewhere,
+// so the iridescent data layer shows through and catches the rainbow.
 function discPrint() {
   return canvasTex(TEXN, (x, s) => {
-    const c = s / 2;
-    x.save(); x.beginPath(); x.arc(c, c, c, 0, 7); x.clip();
-    x.drawImage(imgWind, 0, 0, s, s);
-    const g = x.createRadialGradient(c, c, s * .2, c, c, c); g.addColorStop(0, 'rgba(12,14,20,0)'); g.addColorStop(1, 'rgba(12,14,20,.45)');
-    x.fillStyle = g; x.fillRect(0, 0, s, s);
-    x.fillStyle = '#eef1f8'; x.textAlign = 'center';
-    x.font = '700 230px Unison'; x.fillText('SO CLOSE TO WHAT???', c, s * .83);
-    x.font = '700 110px Unison'; x.globalAlpha = .85; x.fillText('TATE McRAE · DELUXE', c, s * .885);
-    x.restore(); grain(x, s, .03);
+    const c = s / 2, u = c / 1.2;                       // u = canvas px per world unit
+    x.fillStyle = '#111317';                             // black ring around the hole
+    x.beginPath(); x.arc(c, c, .37 * u, 0, Math.PI * 2); x.moveTo(c + .17 * u, c); x.arc(c, c, .17 * u, 0, Math.PI * 2, true); x.fill('evenodd');
+    x.fillStyle = '#f2f3f5'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.font = '700 560px Unison'; x.fillText('TATE', c, c - .68 * u);
+    x.font = '700 250px Unison';
+    x.fillText('SO CLOSE', c, c + .52 * u); x.fillText('TO WHAT', c, c + .52 * u + 250); x.fillText('???', c, c + .52 * u + 500);
+    // RCA mark + rim fine print
+    x.lineWidth = 14; x.strokeStyle = '#f2f3f5'; x.beginPath(); x.arc(c, c + 1.04 * u, 70, 0, 7); x.stroke();
+    x.font = '700 64px Unison'; x.fillText('RCA', c, c + 1.04 * u + 4);
+    x.font = '700 34px Unison'; x.globalAlpha = .8;
+    const txt = 'Ⓟ & © 2025 RCA RECORDS, A DIVISION OF SONY MUSIC ENTERTAINMENT · MADE IN THE EU · UNAUTHORIZED COPYING PROHIBITED';
+    x.save(); x.translate(c, c); const r = 1.12 * u;
+    [...txt].forEach((ch, i) => { x.save(); x.rotate(Math.PI * .62 + i * .0105); x.translate(0, r); x.rotate(Math.PI); x.fillText(ch, 0, 0); x.restore(); });
+    x.restore();
   }, 4096);
+}
+
+// Credits panel of the fold-out booklet (from unboxing footage)
+function creditsTex() {
+  return canvasTex(TEXN, (x, s) => {
+    x.fillStyle = '#16182a'; x.fillRect(0, 0, s, s); grain(x, s, .05);
+    x.textBaseline = 'middle'; x.fillStyle = '#8f8c98'; x.textAlign = 'left';
+    const L = 330, Rr = s - 330;
+    x.font = '700 70px Unison'; ['SO', 'CLOSE', 'TO', 'WHAT???'].forEach((w, i) => x.fillText(w, L + i * (Rr - L - 380) / 3, 1560));
+    x.font = '700 900px Unison'; x.save(); x.translate(L, 2100); x.scale((Rr - L) / x.measureText('TATE').width, 1); x.fillText('TATE', 0, 0); x.restore();
+    x.fillStyle = '#d9d8de'; x.font = '700 78px Unison';
+    ['FOR', 'FULL', 'CREDITS', 'GO', 'TO', 'TATEMCRAE.COM/CREDITS'].forEach((w, i, a) => {
+      const pos = [0, .12, .26, .43, .53, .64][i]; x.fillText(w, L + pos * (Rr - L), 2620); });
+    x.font = '700 64px Unison'; x.fillText('EXECUTIVE PRODUCER:', L, 2770);
+    x.globalAlpha = .85; x.fillText('RYAN TEDDER | RCA RECORDS | FULL STOP MANAGEMENT', L + 1060, 2770);
+    x.font = '700 34px Unison'; x.globalAlpha = .55;
+    x.fillText('Ⓟ 2025 & © 2025 RCA RECORDS, A DIVISION OF SONY MUSIC ENTERTAINMENT. ALL RIGHTS RESERVED. MADE IN THE EU.', L, 2900);
+  }, 4096);
+}
+// Spine strip of the back card: blue, "SO CLOSE TO WHAT???" running along it
+function spineTex() {
+  const c = document.createElement('canvas'); c.width = 2048; c.height = 64;
+  const x = c.getContext('2d'); const g = x.createLinearGradient(0, 0, 2048, 0);
+  g.addColorStop(0, '#4f5fa8'); g.addColorStop(1, '#6a7cc4'); x.fillStyle = g; x.fillRect(0, 0, 2048, 64);
+  x.fillStyle = '#eef0f8'; x.font = '700 30px Unison'; x.textBaseline = 'middle';
+  x.fillText('SO CLOSE TO WHAT???', 820, 33); x.font = '700 22px Unison'; x.fillText('TATE', 120, 33); x.fillText('RCA', 1860, 33);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
+}
+function advisoryTex() {
+  return canvasTex(512, (x, s) => {
+    x.fillStyle = '#fff'; x.fillRect(0, 0, s, s * .62); x.fillStyle = '#000'; x.fillRect(14, 14, s - 28, s * .62 - 28);
+    x.fillStyle = '#fff'; x.fillRect(26, 120, s - 52, 110); x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.font = '700 50px Arial'; x.fillText('PARENTAL', s / 2, 72); x.fillStyle = '#000'; x.font = '900 86px Arial'; x.fillText('ADVISORY', s / 2, 178);
+    x.fillStyle = '#fff'; x.font = '700 40px Arial'; x.fillText('EXPLICIT CONTENT', s / 2, 268);
+  });
 }
 
 /* =================================================================
@@ -501,7 +544,7 @@ function buildCD() {
     new THREE.MeshPhysicalMaterial({ color: 0xd2d6de, metalness: 1, roughness: .08, iridescence: 1, iridescenceIOR: 1.8, iridescenceThicknessRange: [250, 900], envMapIntensity: 1.6 }));
   const hub = new THREE.Mesh(latheDisc([[.15, .009], [.34, .009], [.34, -.009], [.15, -.009], [.15, .009]]), glassMat());
   const ring = new THREE.Mesh(latheDisc([[.3, .014], [.32, .014], [.32, .009], [.3, .009], [.3, .014]], 128), glassMat());
-  const print = new THREE.Mesh(new THREE.RingGeometry(.345, 1.195, 256, 1), new THREE.MeshPhysicalMaterial({ map: discPrint(), roughness: .45, clearcoat: .4, clearcoatRoughness: .2 }));
+  const print = new THREE.Mesh(new THREE.RingGeometry(.155, 1.195, 256, 1), new THREE.MeshPhysicalMaterial({ map: discPrint(), transparent: true, roughness: .5, clearcoat: .3, clearcoatRoughness: .2 }));
   // Ring UVs are radial, so remap them planar to match the print
   const p = print.geometry.attributes.position, u = print.geometry.attributes.uv;
   for (let i = 0; i < p.count; i++) u.setXY(i, p.getX(i) / 2.4 + .5, p.getY(i) / 2.4 + .5);
@@ -526,6 +569,9 @@ const hq = await Promise.all([
   'jacket-front', 'jacket-back', 'gatefold-inside', 'sleeve1-a', 'sleeve1-b', 'sleeve2-a', 'sleeve2-b', 'poster',
 ].map(n => loadImg(`img/hq/${n}.webp`)));
 const [hqFront, hqBack, hqGate, hqS1a, hqS1b, hqS2a, hqS2b, hqPoster] = hq;
+// deluxe CD booklet panels + tray card (matched to the deluxe photoshoot)
+const CD_IMGS = ['cd-p1a', 'cd-p2a', 'cd-p3a', 'cd-p4a', 'cd-p5a', 'cd-p7a', 'cd-p1b', 'cd-p2b', 'cd-p3b', 'cd-p4b', 'cd-p5b', 'cd-p6b', 'cd-p7b', 'cd-tray'];
+const imgCD = Object.fromEntries(await Promise.all(CD_IMGS.map(async n => [n, await loadImg(`img/cd/${n}.webp`)])));
 
 // Keyframe track: [t, [x,y,z], [rx,ry,rz]] eased between neighbours
 // Keyframe track as one continuous curve per axis (monotone cubic / PCHIP):
@@ -815,6 +861,8 @@ const stickerTex = canvasTex(1024, (x, s) => {
   warm(S, camera);
   const VMAX = .075;   // whole unboxing takes at least ~13s, no matter how hard you scroll
   [[[.385, .395], [.65, .665], [.745, .745], [.86, .89]], [], [[.8, .815]], []].forEach((w, i) => pickables[i].noLift = w);
+  // only once a piece is out and resting: jacket when emptied, insert/sleeves when parked
+  [.9, .47, .67, .9].forEach((v, i) => pickables[i].minP = v);
   STAGES.vinyl = { update, root, S, groups: [['back', backP], ['front', frontP], ['posterLow', pLow], ['posterTop', pTop], ['s1a', sleeve1.userData.sheets[0]], ['s1b', sleeve1.userData.sheets[1]], ['lp1', lp1], ['s2a', sleeve2.userData.sheets[0]], ['s2b', sleeve2.userData.sheets[1]], ['lp2', lp2]] };
   function frame(now) {
     const dt = Math.min((now - t0) / 1000, .05); t0 = now;
@@ -863,55 +911,119 @@ const stickerTex = canvasTex(1024, (x, s) => {
   const { root, camera, pickables } = S;
   const W = 2.84, H = 2.5, LIDZ = .135;
 
+  // Standard jewel case, to scale (142 × 125 × 10.4 mm; 1 unit = 50 mm): three clear polystyrene parts.
+  //  base  – thin back plate with the spine wall and two hinge pins
+  //  tray  – sits in the base: disc well, 12-tooth rosette, finger notches
+  //  lid   – front plate with top/bottom flanges that wrap the base, booklet tabs, and two hinge arms
+  // The lid pivots on the pins near the back of the spine, like the real thing.
   const caseG = new THREE.Group(); root.add(caseG);
-  const base = new THREE.Mesh(new RoundedBoxGeometry(W, H, .05, 3, .015), glassMat()); base.position.z = -.09; caseG.add(base);
-  const trayMat = new THREE.MeshPhysicalMaterial({ color: 0x0f1014, roughness: .38, clearcoat: .6, clearcoatRoughness: .25 });
-  const tray = shadowed(new THREE.Mesh(new RoundedBoxGeometry(W - .2, H - .06, .1, 3, .02), trayMat)); tray.position.set(.08, 0, -.02); caseG.add(tray);
-  const well = shadowed(new THREE.Mesh(new THREE.CylinderGeometry(1.24, 1.24, .02, 128).rotateX(Math.PI / 2), trayMat)); well.position.set(.12, 0, .03); caseG.add(well);
+  const HZ = -.06;                                   // hinge pin axis, near the back of the spine
+  const clear = (op = .1, tint = 0xf2f6fb) => new THREE.MeshPhysicalMaterial({
+    color: tint, transparent: true, opacity: op, depthWrite: false, roughness: .02, metalness: 0,
+    clearcoat: 1, clearcoatRoughness: .02, envMapIntensity: 2.6, specularIntensity: 1 });
+  const edgeMat = clear(.32, 0xdfe8f5);              // polished edges read brighter, like real polystyrene
+  const glassBox = (w, h, d, op, ro = 2) => { const b = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 2, Math.min(d * .45, .008)), clear(op)); b.renderOrder = ro; return b; };
+  const edge = (w, h, d, x, y, z, parent, ro = 2) => { const e = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), edgeMat); e.position.set(x, y, z); e.renderOrder = ro; parent.add(e); return e; };
+  // base
+  const base = glassBox(W, H, .016, .1, 1); base.position.z = -.13; caseG.add(base);
+  edge(.035, H, .17, -W / 2 + .018, 0, -.04, caseG, 1);                    // spine wall
+  for (const y of [-1, 1]) { const pin = new THREE.Mesh(new THREE.CylinderGeometry(.018, .018, .08, 16), edgeMat); pin.position.set(-W / 2, y * (H / 2 - .07), HZ); caseG.add(pin); }
+  // tray
+  const tray = glassBox(W - .1, H - .05, .13, .07, 2); tray.position.set(.03, 0, -.02); caseG.add(tray);
+  edge(W - .1, .012, .13, .03, H / 2 - .031, -.02, caseG); edge(W - .1, .012, .13, .03, -H / 2 + .031, -.02, caseG);
+  const well = new THREE.Mesh(new THREE.RingGeometry(1.215, 1.24, 128), edgeMat); well.position.set(.12, 0, .046); well.renderOrder = 3; caseG.add(well);
+  for (const y of [-1, 1]) {                                               // finger notches either side of the well
+    const n = new THREE.Mesh(new THREE.RingGeometry(.1, .12, 32, 1, 0, Math.PI), edgeMat);
+    n.position.set(.12, y * 1.2, .046); n.rotation.z = y > 0 ? Math.PI : 0; n.renderOrder = 3; caseG.add(n);
+  }
+  const toothMat = clear(.45, 0xf7f9fc);
   for (let i = 0; i < 12; i++) {
     const a = i / 12 * Math.PI * 2;
-    const tooth = shadowed(new THREE.Mesh(new RoundedBoxGeometry(.05, .09, .06, 2, .015), trayMat));
-    tooth.position.set(.12 + Math.cos(a) * .13, Math.sin(a) * .13, .054); tooth.rotation.z = a; caseG.add(tooth);
+    const tooth = new THREE.Mesh(new RoundedBoxGeometry(.045, .09, .05, 2, .012), toothMat);
+    tooth.position.set(.12 + Math.cos(a) * .125, Math.sin(a) * .125, .06); tooth.rotation.z = a; tooth.renderOrder = 3; caseG.add(tooth);
   }
-  for (let i = 0; i < 2; i++) {
-    const k = new THREE.Mesh(new THREE.CylinderGeometry(.04, .04, .35, 24), glassMat());
-    k.position.set(-W / 2, i ? .95 : -.95, .03); caseG.add(k);
+  // lid (built in hinge space: local z 0 = pin axis)
+  const lidHinge = new THREE.Group(); lidHinge.position.set(-W / 2, 0, HZ); caseG.add(lidHinge);
+  const LZ = LIDZ - HZ;                                                    // lid inner face, measured from the pin axis
+  const lid = glassBox(W, H, .022, .09, 4); lid.position.set(W / 2, 0, LZ + .011); lidHinge.add(lid);
+  for (const y of [-1, 1]) {
+    edge(W - .22, .016, LZ + .03, W / 2 + .11, y * (H / 2 - .008), (LZ - .03) / 2, lidHinge, 4);   // top/bottom flanges
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(.03, .03, .2, 20), edgeMat);            // hinge knuckles
+    arm.position.set(0, y * (H / 2 - .07), 0); arm.renderOrder = 4; lidHinge.add(arm);
+    edge(.06, .2, LZ, .03, y * (H / 2 - .07), LZ / 2, lidHinge, 4);                                 // arm up to the plate
   }
-  const lidHinge = new THREE.Group(); lidHinge.position.set(-W / 2, 0, LIDZ); caseG.add(lidHinge);
-  const lid = new THREE.Mesh(new RoundedBoxGeometry(W, H, .045, 3, .015), glassMat()); lid.position.x = W / 2; lidHinge.add(lid);
-  // the small tabs inside the lid that hold the booklet
-  for (const y of [-1, 1]) for (const x of [.25, W - .25]) {
-    const tab = new THREE.Mesh(new THREE.BoxGeometry(.3, .03, .016), glassMat()); tab.position.set(x, y * (H / 2 - .07), -.03); lidHinge.add(tab);
-  }
+  for (const y of [-1, 1]) for (const x of [.25, W - .25]) edge(.3, .03, .016, x, y * (H / 2 - .07), LZ - .03 + .006, lidHinge, 4);   // booklet tabs
 
-  const backInsert = printPanel(W - .14, H - .1, .004, art(hqBack), art(imgWind), .2);
+  // back card: sky/mountains face up into the clear tray, tracklist + heels on the outside, blue spines folded at both ends
+  const backInsert = printPanel(W - .14, H - .1, .004, art(imgCD['cd-tray']), art(hqBack), .2);   // tray card: between tray and base
+  const spineMat = new THREE.MeshStandardMaterial({ map: spineTex(), roughness: .6 });
+  for (const sx of [-1, 1]) {
+    const sp = new THREE.Mesh(new THREE.PlaneGeometry(H - .1, .16), spineMat);
+    sp.rotation.set(0, sx * Math.PI / 2, sx * Math.PI / 2); sp.position.set(sx * ((W - .14) / 2 + .002), 0, .08);
+    sp.userData.noclip = true; backInsert.add(sp);
+  }
   root.add(backInsert);
 
-  const booklet = new THREE.Group();
-  const bS = 2.36;
-  const bBack = printPanel(bS, bS, .012, art(imgWind), art(hqBack), .08); bBack.position.x = bS / 2;
-  const bHinge = new THREE.Group();
-  const bFront = printPanel(bS, bS, .012, art(hqFront), art(hqGate, { repeat: [.5, 1], offset: [0, 0] }), .08);
-  bFront.position.set(bS / 2, 0, .013); bHinge.add(bFront);
-  const bWrap = new THREE.Group(); bWrap.add(bBack, bHinge); bWrap.position.set(-bS / 2, 0, -.0065);
-  booklet.add(bWrap); root.add(booklet);
+  // 7-panel accordion booklet. Front side: cover → photos → credits. Back side ends on the windswept
+  // photo, which is what you see through the open lid.
+  const bS = 2.36, NP = 7, PT = .003, GAPZ = .0035;
+  const A = ['cd-p1a', 'cd-p2a', 'cd-p3a', 'cd-p4a', 'cd-p5a', 'cd-p7a', null];
+  const B = ['cd-p1b', 'cd-p2b', 'cd-p3b', 'cd-p4b', 'cd-p5b', 'cd-p6b', 'cd-p7b'];
+  const credits = creditsTex();
+  const booklet = new THREE.Group(), bWrap = new THREE.Group(); booklet.add(bWrap);
+  const bHinges = []; let parent = bWrap;
+  for (let i = 0; i < NP; i++) {
+    const hg = new THREE.Group();
+    if (i) { hg.position.set(bS, 0, (i % 2 ? -1 : 1) * GAPZ); bHinges.push(hg); }
+    parent.add(hg);
+    const panel = printPanel(bS, bS, PT, A[i] ? art(imgCD[A[i]]) : credits, art(imgCD[B[i]]), .12);
+    panel.position.x = bS / 2; hg.add(panel);
+    parent = hg;
+  }
+  root.add(booklet);
+  // fold state: u = 0 closed stack, 1 = open zig-zag fan. Returns the folded stack's centre offset.
+  const FAN = 1.55;
+  function foldBooklet(u) {
+    const psi = PI - u * (PI - FAN), beta = -u * FAN / 2;
+    bWrap.children[0].rotation.y = beta;
+    bHinges.forEach((h, i) => h.rotation.y = (i % 2 ? -1 : 1) * psi);
+    // centre the booklet: walk the chain of panel edges
+    let x = 0, z = 0, ang = beta, minx = 0, maxx = 0, minz = 0, maxz = 0;
+    for (let i = 0; i < NP; i++) {
+      if (i) ang += (i % 2 ? 1 : -1) * psi;
+      x += bS * Math.cos(ang); z -= bS * Math.sin(ang);
+      minx = Math.min(minx, x); maxx = Math.max(maxx, x); minz = Math.min(minz, z); maxz = Math.max(maxz, z);
+    }
+    bWrap.position.set(-(minx + maxx) / 2, 0, -(minz + maxz) / 2);
+  }
 
   const disc = buildCD(); const dSpin = disc.userData.spin; root.add(disc);
+
+  // shrink-wrap with the blue TATE hype sticker and the Parental Advisory sticker
+  const wrap = new THREE.Group(); root.add(wrap);
+  const film = new THREE.Mesh(new RoundedBoxGeometry(W + .04, H + .04, .26, 3, .02), new THREE.MeshPhysicalMaterial({
+    color: 0xffffff, roughness: .06, transparent: true, opacity: .16, clearcoat: 1, normalMap: crinkle, normalScale: new THREE.Vector2(.3, .3), envMapIntensity: 2.4, depthWrite: false }));
+  film.position.z = .02; film.renderOrder = 2; wrap.add(film);
+  const cdSticker = new THREE.Mesh(new THREE.PlaneGeometry(.62, .62), new THREE.MeshPhysicalMaterial({ map: stickerTex, roughness: .35, clearcoat: .6, transparent: true }));
+  cdSticker.position.set(W / 2 - .45, H / 2 - .42, .152); wrap.add(cdSticker);
+  const pa = new THREE.Mesh(new THREE.PlaneGeometry(.36, .36), new THREE.MeshStandardMaterial({ map: advisoryTex(), roughness: .5, transparent: true }));
+  pa.position.set(W / 2 - .3, -H / 2 + .2, .152); wrap.add(pa);
 
   pickables.push({ obj: caseG, focus: 0, lift: 0 }, { obj: booklet, focus: 0, lift: 0 }, { obj: disc, focus: 0, lift: 0 }, { obj: backInsert, focus: 0, lift: 0 });
 
   const PI = Math.PI;
   const T = {
-    caseG: track([[0, [0, 0, 0], [-.3, .7, 0]], [.12, [0, 0, 0], [0, 0, 0]], [.86, [0, 0, 0], [0, 0, 0]], [1, [.7, -.1, -1.6], [0, -.12, 0]]]),
+    caseG: track([[0, [0, 0, 0], [-.3, .7, 0]], [.12, [0, 0, 0], [0, 0, 0]], [.86, [0, 0, 0], [0, 0, 0]], [1, [.7, -.4, -1.6], [0, -.12, 0]]]),
     // booklet, in lid-hinge space: tucked under the tabs, then slid out past the free edge
-    bookIn: track([[.28, [W / 2 + .06, 0, -.036], [0, 0, 0]], [.36, [W + bS / 2 + .1, 0, -.036], [0, 0, 0]]]),
+    bookIn: track([[.28, [W / 2 + .06, 0, LIDZ - HZ - .026], [0, 0, 0]], [.36, [W + bS / 2 + .4, 0, LIDZ - HZ - .026], [0, 0, 0]]]),
     // booklet, free (root space) once clear of the lid
-    bookFree: track([[.36, [0, 0, 0], [0, 0, 0]], [.41, [.3, .2, 3.4], [0, .05, 0]], [.47, [.3, .2, 3.4], [0, .05, 0]], [.495, [-.2, 2.65, 3.2], [.1, 0, 0]], [.52, [-.5, 2.75, -.6], [.15, 0, 0]]]),
-    disc: track([[.5, [.12, 0, .07], [0, 0, 0]], [.55, [.12, 0, .8], [0, 0, 0]], [.62, [2.5, .5, 1.8], [0, -.35, 0]]]),
-    insert: track([[.66, [0, 0, -.125], [0, 0, 0]], [.74, [0, -2.75, -.125], [0, 0, 0]], [.8, [.4, -2.7, .9], [-.3, 0, 0]], [.86, [.4, -2.45, 1.3], [-.2, -.1, 0]]]),
+    // free (root space): to the front, unfolds there, rises, then parks above the case
+    bookFree: track([[.36, [0, 0, 0], [0, 0, 0]], [.41, [0, .2, 3.0], [0, 0, 0]], [.495, [0, .2, 3.0], [0, 0, 0]], [.52, [0, 3.05, 2.6], [.08, 0, 0]], [.55, [0, 2.75, -1.6], [.12, 0, 0]]]),
+    disc: track([[.55, [.12, 0, .07], [0, 0, 0]], [.6, [.12, 0, .8], [0, 0, 0]], [.66, [2.6, .1, 1.8], [0, -.35, 0]]]),
+    insert: track([[.68, [0, 0, -.105], [0, 0, 0]], [.76, [0, -2.75, -.105], [0, 0, 0]], [.8, [0, -2.95, 1.3], [0, 0, 0]], [.84, [0, -2.95, 1.3], [0, Math.PI, 0]], [.88, [-2.6, -1.6, 1.5], [-.1, Math.PI + .35, 0]]]),   // turns around so the tracklist side faces you
   };
   // camera: [position], [look-at]; pans left to follow the booklet out of the lid
-  const CAM = track([[0, [0, .4, 8], [0, 0, 0]], [.28, [0, .4, 8.5], [0, 0, 0]], [.33, [-2.7, .4, 10.2], [-2.7, 0, 0]], [.37, [-2.7, .4, 10.2], [-2.7, 0, 0]], [.42, [-.6, .4, 10.5], [-.2, .1, 0]], [.5, [0, .5, 12.5], [0, .3, 0]], [.86, [0, .5, 12.8], [0, .15, 0]], [1, [0, .7, 13.5], [0, .15, 0]]]);
+  const CAM = track([[0, [0, .4, 8], [0, 0, 0]], [.28, [0, .4, 8.5], [0, 0, 0]], [.33, [-2.7, .4, 10.2], [-2.7, 0, 0]], [.37, [-2.7, .4, 10.2], [-2.7, 0, 0]], [.42, [0, .4, 11.5], [0, .2, 0]], [.5, [0, .5, 12.5], [0, .5, 0]], [.86, [0, .5, 13.3], [0, .5, 0]], [1, [0, .7, 14.2], [0, .4, 0]]]);
 
   const m = new THREE.Matrix4(), inv = new THREE.Matrix4(), qa = new THREE.Quaternion(), qb = new THREE.Quaternion(), e = new THREE.Euler(), va = new THREE.Vector3(), vs = new THREE.Vector3();
 
@@ -921,6 +1033,13 @@ const stickerTex = canvasTex(1024, (x, s) => {
     S.p = p;
     {
       apply(caseG, T.caseG(p));
+      // shrink-wrap peels off upward before the lid opens
+      const strip = seg(p, .03, .11);
+      wrap.visible = strip < .999;
+      wrap.position.copy(caseG.position).add(V(.15 * strip, 3.2 * strip, .3 * strip)); wrap.rotation.copy(caseG.rotation);
+      wrap.rotation.z += -.1 * strip; wrap.scale.set(1 - .05 * strip, 1, 1 + .4 * strip);
+      film.material.opacity = .16 * (1 - seg(p, .08, .11));
+      cdSticker.material.opacity = pa.material.opacity = 1 - seg(p, .09, .11);
       const open = seg(p, .12, .27);
       lidHinge.rotation.y = -2.7 * open;   // opens wide (~155°) so the booklet slides out sideways, in view
 
@@ -937,25 +1056,26 @@ const stickerTex = canvasTex(1024, (x, s) => {
         const tgtPos = new THREE.Vector3(...(p < .41 ? T.bookFree(.41).pos : fp.pos));
         qb.setFromEuler(e.set(...(p < .41 ? T.bookFree(.41).rot : fp.rot)));
         booklet.position.copy(startPos.lerp(tgtPos, free));
-        booklet.quaternion.copy(startQ.slerp(qb, free));
+        booklet.quaternion.copy(startQ.slerp(qb, seg(p, .38, .41)));   // move clear of the lid first, then turn
       }
       booklet.visible = true;   // a real jewel case shows the booklet through the lid from the start
-      const bOpen = seg(p, .43, .48);
-      bHinge.rotation.y = -PI * .9 * bOpen;
-      bWrap.position.x = lerp(-bS / 2, 0, bOpen);
+      // accordion unfolds at the front, then partly folds back to a compact fan to park
+      const unfold = seg(p, .415, .49);
+      foldBooklet(unfold);
+      booklet.scale.setScalar(lerp(1, .62, seg(p, .38, .43)));
 
       // disc: straight up off the rosette, then out, slow tilt to catch the rainbow
       apply(disc, T.disc(p));
-      const dOut = seg(p, .55, .62);
+      const dOut = seg(p, .6, .66);
       disc.rotation.y += dOut * Math.sin(now / 1300) * .45;
       disc.rotation.x += dOut * Math.sin(now / 1700) * .22;
-      dSpin.rotation.z -= dt * 4 * seg(p, .53, .6);
+      dSpin.rotation.z -= dt * 4 * seg(p, .58, .64);
       // while still in the case, the disc rides with the case (offset rotated with it)
-      if (p < .5) { disc.position.applyEuler(caseG.rotation).add(caseG.position); disc.rotation.copy(caseG.rotation); }
+      if (p < .55) { disc.position.applyEuler(caseG.rotation).add(caseG.position); disc.rotation.copy(caseG.rotation); }
 
       // back insert: drops out of the bottom of the base, then tips toward us
       apply(backInsert, T.insert(p));
-      if (p < .66) { backInsert.position.applyEuler(caseG.rotation).add(caseG.position); backInsert.rotation.copy(caseG.rotation); }
+      if (p < .68) { backInsert.position.applyEuler(caseG.rotation).add(caseG.position); backInsert.rotation.copy(caseG.rotation); }
 
       for (const pk of pickables) { pk.lift = lerp(pk.lift, pk.focus, .12); if (pk.lift < .001) pk.lift = 0; pk.obj.position.z += pk.lift * LIFT; }
 
@@ -964,13 +1084,14 @@ const stickerTex = canvasTex(1024, (x, s) => {
       root.rotation.set(S.rot.x, S.rot.y, 0);
       root.position.x = innerWidth > 720 && !document.body.classList.contains('clean') ? -1.1 : 0;
 
-      setSteps(steps, p < .28 ? 0 : p < .5 ? 1 : p < .66 ? 2 : 3);
+      setSteps(steps, p < .12 ? 0 : p < .28 ? 1 : p < .55 ? 2 : p < .68 ? 3 : 4);
     }
   }
   warm(S, camera);
   const VMAX = .11;
-  [[[.16, .205], [.38, .385], [.565, .585]], [], [[.16, .19]], [[.155, .2], [.565, .57]]].forEach((w, i) => pickables[i].noLift = w);
-  STAGES.cd = { update, root, S, groups: [['case', caseG.children.filter(c => c !== lidHinge)], ['lid', lidHinge], ['bookBack', bBack], ['bookFront', bFront], ['disc', disc], ['insert', backInsert]] };
+  // case only once everything is out of it; the others once they are out and parked
+  [.9, .56, .67, .9].forEach((v, i) => pickables[i].minP = v);
+  STAGES.cd = { update, root, S, groups: [['case', caseG.children.filter(c => c !== lidHinge)], ['lid', lidHinge], ['book', booklet], ['disc', disc], ['insert', backInsert]] };
   function frame(now) {
     const dt = Math.min((now - t0) / 1000, .05); t0 = now;
     if (inView(sec)) {
@@ -992,7 +1113,7 @@ const stickerTex = canvasTex(1024, (x, s) => {
       const moving = sp !== S.lastP || S.dirty || !S.drawn
         || Math.abs(S.rot.x - S.rot.tx) + Math.abs(S.rot.y - S.rot.ty) > 1e-5
         || pickables.some(k => Math.abs(k.lift - k.focus) > 1e-4);
-      if (moving || sp > .53) {                       // past .53 a disc is spinning, keep drawing
+      if (moving || sp > .58) {                       // past .58 the disc is spinning, keep drawing
         update(sp, dt, now);
         if (moving) S.renderer.shadowMap.needsUpdate = true;   // a spinning disc casts the same shadow
         S.renderer.render(S.scene, camera);
