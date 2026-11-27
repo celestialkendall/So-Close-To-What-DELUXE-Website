@@ -2,6 +2,8 @@
 
 A fan-made site for Tate McRae's *So Close To What??? (Deluxe)*: scroll-driven 3D unboxing of the 2LP ultra-clear vinyl and the CD, tracklist with Spotify / Apple Music links, an embedded Spotify player, and other releases.
 
+This site was fully created and coded by me, Claude handles low memory optimization, pushes, pull requests, and merges.
+
 Not affiliated with Tate McRae or her label. Album artwork and photos © their respective owners.
 
 ## Run locally
