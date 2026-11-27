@@ -12,7 +12,13 @@ const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const bez = (a, c, b, t) => a.clone().multiplyScalar((1 - t) ** 2).add(c.clone().multiplyScalar(2 * (1 - t) * t)).add(b.clone().multiplyScalar(t * t));
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-const loadImg = src => new Promise(res => { const i = new Image(); i.onload = () => res(i); i.src = src; });
+// Phones/tablets get a lighter texture set: same look on a small screen, a fraction of the memory.
+// (Full-size textures add up to ~1.4 GB, more than iOS allows a browser tab, so the tab gets killed.)
+const MOBILE = matchMedia('(pointer: coarse) and (hover: none)').matches;   // touch-only device: phones & tablets
+const TEXN = MOBILE ? 1024 : 2048;      // labels + disc print
+const GROOVE_N = MOBILE ? 1024 : 4096;  // groove normal/roughness maps
+const IMG = p => MOBILE ? 'img/m/' + p.split('/').pop() : p;
+const loadImg = src => new Promise(res => { const i = new Image(); i.onload = () => res(i); i.src = IMG(src); });
 const _texCache = new Map();
 function texFrom(img, opts = {}) {
   const key = img.src + '|' + (opts.repeat || '') + '|' + (opts.offset || '');
@@ -24,9 +30,11 @@ function texFrom(img, opts = {}) {
   t.needsUpdate = true;
   return t;
 }
-function canvasTex(size, draw) {
+// draw() always works in `logical` px; the canvas itself is `size` px
+function canvasTex(size, draw, logical = size) {
   const c = document.createElement('canvas'); c.width = c.height = size;
-  draw(c.getContext('2d'), size);
+  const x = c.getContext('2d'); x.scale(size / logical, size / logical);
+  draw(x, logical);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
   return t;
 }
@@ -160,6 +168,14 @@ function warm(S, camera) {
   S.renderer.compile(S.scene, camera);
   hidden.forEach(o => o.visible = false);
 }
+// Scenes are framed for a wide screen; on a tall phone pull the camera back so the sides aren't cut off
+function fitPortrait(camera, look) {
+  const f = camera.aspect < 1.25 ? Math.sqrt(1.25 / camera.aspect) : 1;
+  if (f === 1) return;
+  camera.position.x = look[0] + (camera.position.x - look[0]) * f;
+  camera.position.y = look[1] + (camera.position.y - look[1]) * f;
+  camera.position.z = look[2] + (camera.position.z - look[2]) * f;
+}
 function adapt(S, dt) {
   const a = S.adapt ??= { avg: 1 / 60, n: 0, pr: S.renderer.getPixelRatio() };
   a.avg = a.avg * .97 + dt * .03; if (++a.n < 120) return;
@@ -229,7 +245,7 @@ const ALL_STAGES = [];
 function makeStage(canvas) {
   const st = {};
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(devicePixelRatio, MOBILE ? 1.5 : 2));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
   renderer.shadowMap.enabled = true;
@@ -243,14 +259,14 @@ function makeStage(canvas) {
   const sky = new THREE.Mesh(new THREE.SphereGeometry(60, 48, 24), new THREE.MeshBasicMaterial({ map: backdropTex(), side: THREE.BackSide, depthWrite: false }));
   scene.add(sky);
 
-  const camera = new THREE.PerspectiveCamera(35, 1, 1, 120);
+  const camera = new THREE.PerspectiveCamera(35, 1, 1, 200);
   scene.add(new THREE.HemisphereLight(0xb8c6ff, 0x0c0e14, .55));
 
   // Key light: the only shadow caster, soft and high-resolution
   const key = new THREE.DirectionalLight(0xffffff, 2.4);
   key.position.set(4, 8, 9);
   key.castShadow = true;
-  key.shadow.mapSize.set(2048, 2048);
+  key.shadow.mapSize.set(MOBILE ? 1024 : 2048, MOBILE ? 1024 : 2048);
   Object.assign(key.shadow.camera, { left: -10, right: 10, top: 10, bottom: -10, near: 1, far: 40 });
   key.shadow.bias = -0.0003; key.shadow.normalBias = .015;
   scene.add(key);
@@ -318,8 +334,8 @@ document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', 
 
 /* =================================================================
    TEXTURES
-   Artwork photos are used at their full source resolution.
-   Everything generated in code (grooves, labels, disc print) is 4096 px.
+   Desktop: artwork at full source resolution, grooves 4096 px, labels/disc print 2048 px.
+   Phones: everything capped at 1024 px (see MOBILE above).
    ================================================================= */
 await document.fonts.load('700 40px Unison');
 const [imgFront, imgBack, imgWind, imgGate] = await Promise.all(
@@ -342,8 +358,8 @@ const paperGrain = (() => {
 
 // Record grooves: real normal + roughness maps (4096²) with song gaps between tracks
 const grooveMaps = await new Promise(resolve => {
-  const src = `onmessage = () => {
-    const N = 4096, R = 1.46, half = N / 2;
+  const src = `onmessage = ({ data: N }) => {
+    const R = 1.46, half = N / 2, period = Math.max(.0042, 6.4 * R / N);   // keep grooves above pixel size
     const nrm = new Uint8Array(N * N * 4), rgh = new Uint8Array(N * N * 4);
     const outer = 1.40, inner = .66, tracks = 5;
     const gaps = Array.from({ length: tracks - 1 }, (_, i) => outer - (outer - inner) * (i + 1) / tracks);
@@ -351,7 +367,7 @@ const grooveMaps = await new Promise(resolve => {
       const dx = x - half + .5, dy = y - half + .5, dp = Math.hypot(dx, dy), r = dp / half * R;
       let slope = 0, rough = .08;
       if (r > inner && r < outer && !gaps.some(g => Math.abs(r - g) < .007)) {
-        slope = Math.cos(r / .0042 * Math.PI * 2) * .55; rough = .22 + .06 * Math.sin(r * 90);
+        slope = Math.cos(r / period * Math.PI * 2) * .55; rough = .22 + .06 * Math.sin(r * 90);
       } else if (r >= .54 && r <= inner) { slope = Math.cos(r / .03 * Math.PI * 2) * .08; rough = .1; }
       const nx = -slope * dx / (dp || 1), ny = slope * dy / (dp || 1), len = Math.hypot(nx, ny, 1);
       const i = (y * N + x) * 4;
@@ -362,19 +378,20 @@ const grooveMaps = await new Promise(resolve => {
   };`;
   const w = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
   w.onmessage = ({ data }) => {
-    const mk = d => { const t = new THREE.DataTexture(d, 4096, 4096); t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter; t.anisotropy = 16; t.needsUpdate = true; return t; };
+    const mk = d => { const t = new THREE.DataTexture(d, GROOVE_N, GROOVE_N); t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter; t.anisotropy = 16; t.needsUpdate = true; return t; };
     resolve({ normal: mk(data.nrm), rough: mk(data.rgh) }); w.terminate();
   };
-  w.postMessage(0);
+  w.postMessage(GROOVE_N);
 });
 
 function grain(x, s, a = .05) {
-  for (let i = 0; i < s * s / 30; i++) { x.globalAlpha = Math.random() * a; x.fillStyle = Math.random() < .5 ? '#000' : '#fff'; x.fillRect(Math.random() * s, Math.random() * s, 2, 2); }
+  const n = s * s / 30 * Math.min(1, (TEXN / s) ** 2);   // grain density matches the real canvas size
+  for (let i = 0; i < n; i++) { x.globalAlpha = Math.random() * a; x.fillStyle = Math.random() < .5 ? '#000' : '#fff'; x.fillRect(Math.random() * s, Math.random() * s, 2, 2); }
   x.globalAlpha = 1;
 }
 // Labels match the pressing: LP1 light blue, LP2 charcoal (from unboxing footage)
 function labelTex(side, songs, bg = '#2b2d34', fg = '#eef1f8') {
-  return canvasTex(4096, (x, s) => {
+  return canvasTex(TEXN, (x, s) => {
     const c = s / 2;
     x.fillStyle = bg; x.beginPath(); x.arc(c, c, c, 0, 7); x.fill();
     grain(x, s, .06);
@@ -389,10 +406,10 @@ function labelTex(side, songs, bg = '#2b2d34', fg = '#eef1f8') {
     x.fillText('SO CLOSE TO WHAT??? (DELUXE)', c, c - 90);
     x.fillText('33⅓ RPM', c - 1150, c); x.fillText('STEREO', c + 1150, c);
     x.globalCompositeOperation = 'destination-out'; x.beginPath(); x.arc(c, c, 100, 0, 7); x.fill();
-  });
+  }, 4096);
 }
 function discPrint() {
-  return canvasTex(4096, (x, s) => {
+  return canvasTex(TEXN, (x, s) => {
     const c = s / 2;
     x.save(); x.beginPath(); x.arc(c, c, c, 0, 7); x.clip();
     x.drawImage(imgWind, 0, 0, s, s);
@@ -402,7 +419,7 @@ function discPrint() {
     x.font = '700 230px Unison'; x.fillText('SO CLOSE TO WHAT???', c, s * .83);
     x.font = '700 110px Unison'; x.globalAlpha = .85; x.fillText('TATE McRAE · DELUXE', c, s * .885);
     x.restore(); grain(x, s, .03);
-  });
+  }, 4096);
 }
 
 /* =================================================================
@@ -786,7 +803,7 @@ const stickerTex = canvasTex(1024, (x, s) => {
 
       // camera: pulls back as more pieces come out
       const cam = CAM(p);
-      camera.position.set(...cam.pos); camera.lookAt(...cam.rot);
+      camera.position.set(...cam.pos); fitPortrait(camera, cam.rot); camera.lookAt(...cam.rot);
 
       S.rot.x = lerp(S.rot.x, S.rot.tx, .1); S.rot.y = lerp(S.rot.y, S.rot.ty, .1);
       root.rotation.set(S.rot.x, S.rot.y, 0);
@@ -942,7 +959,7 @@ const stickerTex = canvasTex(1024, (x, s) => {
 
       for (const pk of pickables) { pk.lift = lerp(pk.lift, pk.focus, .12); if (pk.lift < .001) pk.lift = 0; pk.obj.position.z += pk.lift * LIFT; }
 
-      const cam = CAM(p); camera.position.set(...cam.pos); camera.lookAt(...cam.rot);
+      const cam = CAM(p); camera.position.set(...cam.pos); fitPortrait(camera, cam.rot); camera.lookAt(...cam.rot);
       S.rot.x = lerp(S.rot.x, S.rot.tx, .1); S.rot.y = lerp(S.rot.y, S.rot.ty, .1);
       root.rotation.set(S.rot.x, S.rot.y, 0);
       root.position.x = innerWidth > 720 && !document.body.classList.contains('clean') ? -1.1 : 0;
