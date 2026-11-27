@@ -222,3 +222,8 @@ footer { text-align: center; font-size: 12px; opacity: .5; padding: 40px 16px 14
 .rel-cta { font-family: var(--display); font-size: 12px; letter-spacing: .3em; text-transform: uppercase; margin-top: 8px; display: inline-flex; align-items: center; gap: 8px; }
 .rel-cta::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; animation: pulse 1.8s ease-in-out infinite; }
 @keyframes pulse { 50% { opacity: .25; transform: scale(.7); } }
+
+@media (max-width: 720px) {
+  .stage-controls { bottom: 86px; }   /* clear of the View only button */
+  .drag-hint { top: auto; bottom: 140px; }
+}
